@@ -3,6 +3,9 @@
 # Rwanda sector-level spatio-temporal malaria modelling with climate covariates
 # ============================================================================
 
+# ----------------------------------------------------------------------------
+# 1) SETUP: Packages, options, and paths
+# ----------------------------------------------------------------------------
 pacman::p_load(
   dplyr, sf, tidyr, ggplot2, lubridate, ggtext,
   INLA, spdep, readxl, rio, here, stringr,
@@ -413,6 +416,9 @@ fixef_climate <- fixef %>%
 print(fixef_climate)
 
 # ============================================================
+# POST-PROCESSING: Spatial RR, Exceedance PP, Temporal RR + CI
+# Requires: fit_final, dat (sf), INLA
+# ============================================================
 
 # ============================================================
 # 1) SPATIAL: RR_i + 95% CrI + posterior exceedance P(RR>1)
@@ -480,7 +486,6 @@ temp_out <- temp_out %>%
 # 3) (Optional) SPACE–TIME interaction: RR_st + 95% CrI
 # ============================================================
 
-
 # ============================================================
 # 5) Quick prints
 # ============================================================
@@ -539,8 +544,6 @@ year_pp <- st_join2 %>%
     PP_year = mean(PP_st_gt1, na.rm = TRUE),
     .groups = "drop"
   )
-
-
 
 geo_sec <- dat %>%
   group_by(ID) %>% slice(1) %>% ungroup() %>%
@@ -972,6 +975,5 @@ ggplot() +
     axis.text.x = element_text(size = 7),
     axis.text.y = element_text(size = 7)
   )
-
 
 
