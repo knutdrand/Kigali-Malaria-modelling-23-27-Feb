@@ -12,7 +12,7 @@ pacman::p_load(
   INLAOutputs, viridis, patchwork, rnaturalearthdata,
   plotly, gganimate, leaflet, rnaturalearth,
   RColorBrewer, gifski, forecast, shiny, tibble
-
+  
 )
 
 # (Optional) Global options
@@ -57,7 +57,7 @@ ggplot(Rwa_data) +
 
 
 # ----------------------------------------------------------------------------
-# 3) DATA INGESTION: Load U5 + malaria datasets, clean keys
+# 3) DATA INGESTION: malaria datasets, clean keys
 # ----------------------------------------------------------------------------
 U5_raw      <- read_excel(u5_path)
 Malaria_raw <- read_excel(mal_path)
@@ -174,7 +174,7 @@ df_clim <- dat %>% st_drop_geometry() %>%
   na.omit()
 
 #df_clim <- dat %>% st_drop_geometry() %>%
- # select(Max_temperature, Prec, Min_temperature, Relative_humidity, Air_Temperature) %>%
+# select(Max_temperature, Prec, Min_temperature, Relative_humidity, Air_Temperature) %>%
 #  na.omit()
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # adjust margins so the title has room
@@ -209,109 +209,12 @@ dat <- dat %>%
   mutate(
     offset_pop = log(Population / 1000)
   )
-# 1.1 IID (unstructured heterogeneity only)
 
-formula_iid <- as.integer(Malaria_Cases) ~ 1 +
-  f(ID, model = "iid",
-    hyper = list(prec = list(prior="pc.prec", param=c(1, 0.01))))
-#1.2 ICAR / Besag (structured spatial only)
-formula_besag <- as.integer(Malaria_Cases) ~ 1 +
-  f(ID, model = "besag", graph = Rwa_adj, scale.model = TRUE, constr = TRUE,
-    hyper = list(prec = list(prior="pc.prec", param=c(1, 0.01))))
-#1.3 BYM (Besag + IID)
-formula1_bym <- as.integer(Malaria_Cases) ~ 1 +
-  f(ID, model = "bym", graph = Rwa_adj, scale.model = TRUE, constr = TRUE)
 #1.4 BYM2 (recommended modern reparameterisation)
 hyper_bym2 <- list(
   prec = list(prior = "pc.prec", param = c(1, 0.01)),
   phi  = list(prior = "pc",      param = c(0.5, 0.5))
 )
-
-formula1_bym2 <- as.integer(Malaria_Cases) ~ 1 +
-  f(ID, model="bym2", graph=Rwa_adj, scale.model=TRUE, constr=TRUE, hyper=hyper_bym2)
-
-#2) Time-only models (no space)
-#2.1 RW1 time trend
-formula_rw1 <- as.integer(Malaria_Cases) ~ 1 +
-  f(ID.time, model="rw1", constr=TRUE, scale.model=TRUE,
-    hyper=list(prec=list(prior="pc.prec", param=c(1,0.01))))
-#2.2 RW2 time trend (smoother than RW1)
-formula_rw2 <- as.integer(Malaria_Cases) ~ 1 +
-  f(ID.time, model="rw2", constr=TRUE, scale.model=TRUE,
-    hyper=list(prec=list(prior="pc.prec", param=c(1,0.01))))
-#2.3 RW1 + iid time noise
-dat <- dat %>% mutate(ID.time.iid = ID.time)
-
-formula_rw1_iid <- as.integer(Malaria_Cases) ~ 1 +
-  f(ID.time, model="rw1", constr=TRUE, scale.model=TRUE,
-    hyper=list(prec=list(prior="pc.prec", param=c(1,0.01)))) +
-  f(ID.time.iid, model="iid",
-    hyper=list(prec=list(prior="pc.prec", param=c(1,0.01))))
-#3) Spatio-temporal models (space + time)
-#3.1 “Basic” BYM + RW1 (no interaction)
-formula_bym_rw1 <- as.integer(Malaria_Cases) ~ 1 +
-  f(ID, model="bym", graph=Rwa_adj, scale.model=TRUE, constr=TRUE) +
-  f(ID.time, model="rw1", constr=TRUE, scale.model=TRUE,
-    hyper=list(prec=list(prior="pc.prec", param=c(1,0.01))))
-#3.2 Your model: BYM + RW1 + iid space-time interaction (Type I)
-formula_bym_rw1_iidst <- as.integer(Malaria_Cases) ~ 1 +
-  f(ID, model="bym", graph=Rwa_adj, scale.model=TRUE, constr=TRUE) +
-  f(ID.time, model="rw1", constr=TRUE, scale.model=TRUE,
-    hyper=list(prec=list(prior="pc.prec", param=c(1,0.01)))) +
-  f(ID.space.time, model="iid", constr=TRUE,
-    hyper=list(prec=list(prior="pc.prec", param=c(1,0.01))))
-#3.3 BYM + RW2 + iid space-time interaction
-formula_bym_rw2_iidst <- as.integer(Malaria_Cases) ~ 1 +
-  f(ID, model="bym", graph=Rwa_adj, scale.model=TRUE, constr=TRUE) +
-  f(ID.time, model="rw2", constr=TRUE, scale.model=TRUE,
-    hyper=list(prec=list(prior="pc.prec", param=c(1,0.01)))) +
-  f(ID.space.time, model="iid", constr=TRUE,
-    hyper=list(prec=list(prior="pc.prec", param=c(1,0.01))))
-#3.4 BYM2 + RW1 + iid space-time interaction (recommended upgrade)
-formula_bym2_rw1_iidst <- as.integer(Malaria_Cases) ~ 1 +
-  f(ID, model="bym2", graph=Rwa_adj, scale.model=TRUE, constr=TRUE, hyper=hyper_bym2) +
-  f(ID.time, model="rw1", constr=TRUE, scale.model=TRUE,
-    hyper=list(prec=list(prior="pc.prec", param=c(1,0.01)))) +
-  f(ID.space.time, model="iid", constr=TRUE,
-    hyper=list(prec=list(prior="pc.prec", param=c(1,0.01))))
-#3.5 BYM2 + RW2 + iid space-time interaction
-formula_bym2_rw2_iidst <- as.integer(Malaria_Cases) ~ 1 +
-  f(ID, model="bym2", graph=Rwa_adj, scale.model=TRUE, constr=TRUE, hyper=hyper_bym2) +
-  f(ID.time, model="rw2", constr=TRUE, scale.model=TRUE,
-    hyper=list(prec=list(prior="pc.prec", param=c(1,0.01)))) +
-  f(ID.space.time, model="iid", constr=TRUE,
-    hyper=list(prec=list(prior="pc.prec", param=c(1,0.01))))
-#4.2 Type II: iid space × structured time (area-specific RW1/RW2)
-formula_typeII_rw1 <- as.integer(Malaria_Cases) ~ 1 +
-  f(ID, model="bym2", graph=Rwa_adj, scale.model=TRUE, constr=TRUE, hyper=hyper_bym2) +
-  f(ID.time, model="rw1", constr=TRUE, scale.model=TRUE,
-    hyper=list(prec=list(prior="pc.prec", param=c(1,0.01)))) +
-  f(ID.time, model="rw1", replicate=repl_space, constr=TRUE, scale.model=TRUE,
-    hyper=list(prec=list(prior="pc.prec", param=c(1,0.01))))
-#4.3 Type III: structured space × iid time (spatial field repeated each month)
-formula_typeIII <- as.integer(Malaria_Cases) ~ 1 +
-  f(ID, model="bym2", graph=Rwa_adj, scale.model=TRUE, constr=TRUE, hyper=hyper_bym2) +
-  f(ID.time, model="rw1", constr=TRUE, scale.model=TRUE,
-    hyper=list(prec=list(prior="pc.prec", param=c(1,0.01)))) +
-  f(ID, model="bym2", graph=Rwa_adj, replicate=repl_time,
-    scale.model=TRUE, constr=TRUE, hyper=hyper_bym2)
-#4.4 Type IV: structured space × structured time (dynamic spatial field)
-formula_typeIV <- as.integer(Malaria_Cases) ~ 1 +
-  f(ID, model="bym2", graph=Rwa_adj, scale.model=TRUE, constr=TRUE, hyper=hyper_bym2,
-    group = ID.time,
-    control.group = list(model = "rw1"))
-formula_typeIV_rw2 <- as.integer(Malaria_Cases) ~ 1 +
-  f(ID, model="bym2", graph=Rwa_adj, scale.model=TRUE, constr=TRUE, hyper=hyper_bym2,
-    group = ID.time,
-    control.group = list(model = "rw2"))
-
-# 8.2 Basic BYM (space + time + space-time iid)
-formula_bym <- as.integer(Malaria_Cases) ~ 1 +
-  f(ID, model = "bym", graph = Rwa_adj, scale.model = TRUE, constr = TRUE) +
-  f(ID.time, model = "rw1", constr = TRUE, scale.model = TRUE,
-    hyper = list(prec = list(prior = "pc.prec", param = c(1, 0.01)))) +
-  f(ID.space.time, model = "iid", constr = TRUE,
-    hyper = list(prec = list(prior = "pc.prec", param = c(1, 0.01))))
 
 # 8.3 BYM + concurrent climate
 formula_bym_climate <- as.integer(Malaria_Cases) ~ 1 +
@@ -336,118 +239,7 @@ formula_bym_climate_lags <- as.integer(Malaria_Cases) ~ 1 +
     hyper = list(prec = list(prior = "pc.prec", param = c(1, 0.01))))
 # ----------------------------------------------------------------------------
 # 9) MODEL FITTING (INLA)
-# ----------------------------------------------------------------------------
-spatial_model_iid <- inla(
-  formula           = formula_iid,
-  family            = "poisson",
-  data              = dat,
-  offset            = offset_pop,
-  control.compute   = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE),
-  control.predictor = list(compute = TRUE)
-)
-spatial_model_besag <- inla(
-  formula           = formula_besag,
-  family            = "poisson",
-  data              = dat,
-  offset            = offset_pop,
-  control.compute   = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE),
-  control.predictor = list(compute = TRUE)
-)
-spatial_model1_bym <- inla(
-  formula           = formula1_bym,
-  family            = "poisson",
-  data              = dat,
-  offset            = offset_pop,
-  control.compute   = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE),
-  control.predictor = list(compute = TRUE)
-)
-spatial_model1_bym <- inla(
-  formula           = formula1_bym,
-  family            = "poisson",
-  data              = dat,
-  offset            = offset_pop,
-  control.compute   = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE),
-  control.predictor = list(compute = TRUE)
-)
-spatial_model_rw1 <- inla(
-  formula           = formula_rw1,
-  family            = "poisson",
-  data              = dat,
-  offset            = offset_pop,
-  control.compute   = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE),
-  control.predictor = list(compute = TRUE)
-)
-spatial_model_rw1_iid <- inla(
-  formula           = formula_rw1_iid,
-  family            = "poisson",
-  data              = dat,
-  offset            = offset_pop,
-  control.compute   = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE),
-  control.predictor = list(compute = TRUE)
-)
-spatial_model_rw2 <- inla(
-  formula           = formula_rw2,
-  family            = "poisson",
-  data              = dat,
-  offset            = offset_pop,
-  control.compute   = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE),
-  control.predictor = list(compute = TRUE)
-)
-spatial_model_bym_rw1 <- inla(
-  formula           = formula_bym_rw1,
-  family            = "poisson",
-  data              = dat,
-  offset            = offset_pop,
-  control.compute   = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE),
-  control.predictor = list(compute = TRUE)
-)
-spatial_model_bym_rw1_iidst <- inla(
-  formula           = formula_bym_rw1_iidst,
-  family            = "poisson",
-  data              = dat,
-  offset            = offset_pop,
-  control.compute   = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE),
-  control.predictor = list(compute = TRUE)
-)
 
-spatial_model_bym_rw2_iidst <- inla(
-  formula           = formula_bym_rw2_iidst,
-  family            = "poisson",
-  data              = dat,
-  offset            = offset_pop,
-  control.compute   = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE),
-  control.predictor = list(compute = TRUE)
-)
-
-spatial_model_bym2_rw2_iidst <- inla(
-  formula           = formula_bym2_rw2_iidst,
-  family            = "poisson",
-  data              = dat,
-  offset            = offset_pop,
-  control.compute   = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE),
-  control.predictor = list(compute = TRUE)
-)
-
-spatial_model_bym_rw2_iidst <- inla(
-  formula           = formula_bym_rw2_iidst,
-  family            = "poisson",
-  data              = dat,
-  offset            = offset_pop,
-  control.compute   = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE),
-  control.predictor = list(compute = TRUE)
-)
-
-
-
-
-spatial_model <- inla(
-  formula           = formula_bym,
-  family            = "poisson",
-  data              = dat,
-  offset            = offset_pop,
-  control.compute   = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE),
-  control.predictor = list(compute = TRUE)
-)
 
 spatial_model_clima <- inla(
   formula           = formula_bym_climate,
@@ -460,14 +252,13 @@ spatial_model_clima <- inla(
 
 # (Optional) lag model
 spatial_model_clima_lags <- inla(
-formula           = formula_bym_climate_lags,
-family            = "poisson",
-data              = dat,
-offset            = offset_pop,
-control.compute   = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE),
-control.predictor = list(compute = TRUE)
+  formula           = formula_bym_climate_lags,
+  family            = "poisson",
+  data              = dat,
+  offset            = offset_pop,
+  control.compute   = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE),
+  control.predictor = list(compute = TRUE)
 )
-
 
 
 # ------------------------------------------------------------
@@ -550,16 +341,6 @@ compare_inla_models <- function(models, sort_by = c("waic", "dic", "mlcpo"), dec
 # Example usage: put your fitted models into a named list
 # ------------------------------------------------------------
 models_list <- list(
-  iid              = spatial_model_iid,
-  besag            = spatial_model_besag,
-  bym              = spatial_model1_bym,          # or spatial_model (your choice)
-  rw1              = spatial_model_rw1,
-  rw1_iid          = spatial_model_rw1_iid,
-  rw2              = spatial_model_rw2,
-  bym_rw1          = spatial_model_bym_rw1,
-  bym_rw1_iidst    = spatial_model_bym_rw1_iidst,
-  bym_rw2_iidst    = spatial_model_bym_rw2_iidst,
-  bym2_rw2_iidst   = spatial_model_bym2_rw2_iidst,
   bym_climate      = spatial_model_clima,
   bym_climate_lags = spatial_model_clima_lags
 )
@@ -647,18 +428,6 @@ print(fixef_climate)
 # Requires: fit_final, dat (sf), INLA
 # ============================================================
 
-library(dplyr)
-library(sf)
-library(INLA)
-library(tibble)
-#install.packages("tibble")
-# -----------------------------
-# 0) Basic checks
-# -----------------------------
-stopifnot(!is.null(fit_final))
-stopifnot(!is.null(fit_final$summary.random$ID))
-stopifnot(!is.null(fit_final$summary.random$ID.time))
-
 # ============================================================
 # 1) SPATIAL: RR_i + 95% CrI + posterior exceedance P(RR>1)
 # ============================================================
@@ -725,28 +494,20 @@ temp_out <- temp_out %>%
 # 3) (Optional) SPACE–TIME interaction: RR_st + 95% CrI
 # ============================================================
 
-st_out <- NULL
-if (!is.null(fit_final$summary.random$ID.space.time)) {
-  st_out <- fit_final$summary.random$ID.space.time %>%
-    as.data.frame() %>%
-    rownames_to_column("ID.space.time") %>%  # robust: index often in rownames
-    mutate(
-      ID.space.time = as.integer(ID.space.time),
-      RR_st     = exp(mean),
-      RR_st_LCL = exp(`0.025quant`),
-      RR_st_UCL = exp(`0.975quant`)
-    ) %>%
-    select(ID.space.time, RR_st, RR_st_LCL, RR_st_UCL)
-}
+#st_out <- NULL
+#if (!is.null(fit_final$summary.random$ID.space.time)) {
+# st_out <- fit_final$summary.random$ID.space.time %>%
+#   as.data.frame() %>%
+#    rownames_to_column("ID.space.time") %>%  # robust: index often in rownames
+#    mutate(
+#      ID.space.time = as.integer(ID.space.time),
+#     RR_st     = exp(mean),
+#     RR_st_LCL = exp(`0.025quant`),
+#     RR_st_UCL = exp(`0.975quant`)
+#   ) %>%
+#   select(ID.space.time, RR_st, RR_st_LCL, RR_st_UCL)
+#}
 
-# ============================================================
-# 4) Save outputs for dashboard/reporting
-# ============================================================
-
-saveRDS(spat_out,    "post_spatial_RR_PP.rds")
-saveRDS(map_spatial, "post_spatial_RR_PP_sf.rds")
-saveRDS(temp_out,    "post_temporal_RR.rds")
-if (!is.null(st_out)) saveRDS(st_out, "post_spacetime_RR.rds")
 
 # ============================================================
 # 5) Quick prints
@@ -793,7 +554,6 @@ st_join$PP_st_gt1 <- sapply(
   }
 )
 
-library(dplyr)
 
 st_join2 <- st_join %>%
   mutate(
@@ -937,20 +697,19 @@ if (is.null(dat$mu_hat)) {
   dat$mu_ucl <- fit_final$summary.fitted.values$`0.975quant`
 }
 
-# --- Create a month label (use Months_year if it exists) ---
+## --- Create a month label (use Months_year if it exists) ---
 hist_nat <- dat %>%
-  group_by(ID.time) %>%
-  summarise(
-    Months_year = dplyr::first(Months_year),
-    Year  = dplyr::first(Year),
-    Month = dplyr::first(Month),
-    obs   = sum(Malaria_Cases, na.rm = TRUE),
-    fit   = sum(mu_hat, na.rm = TRUE),
-    fit_lcl = sum(mu_lcl, na.rm = TRUE),
-    fit_ucl = sum(mu_ucl, na.rm = TRUE),
-    .groups = "drop"
-  ) %>%
-  arrange(ID.time)
+group_by(ID.time) %>%
+  summarise(Months_year = dplyr::first(Months_year),
+Year  = dplyr::first(Year),
+Month = dplyr::first(Month),
+obs   = sum(Malaria_Cases, na.rm = TRUE),
+fit   = sum(mu_hat, na.rm = TRUE),
+fit_lcl = sum(mu_lcl, na.rm = TRUE),
+fit_ucl = sum(mu_ucl, na.rm = TRUE),
+groups = "drop"
+) %>%
+arrange(ID.time)
 
 # --- Forecast: aggregate to national ---
 fc_nat <- forecast_out %>%
@@ -1241,553 +1000,5 @@ ggplot() +
     axis.text.x = element_text(size = 7),
     axis.text.y = element_text(size = 7)
   )
-
-
-#####################################################################
-id2dist <- id2dist %>%
-  mutate(ID = as.integer(ID))
-
-forecast_tmp <- forecast_out %>%
-  sf::st_drop_geometry() %>%
-  mutate(ID = as.integer(ID))
-
-forecast_out2 <- forecast_tmp %>%
-  left_join(id2dist, by = "ID")
-
-names(forecast_out2)
-table(is.na(forecast_out2$ADM2_EN))
-
-forecast_out2 <- dplyr::left_join(forecast_tmp, id2dist, by = "ID")
-names(forecast_out2)
-
-forecast_out2 <- forecast_out2 %>%
-  sf::st_drop_geometry() %>%  # removes geometry.x/geometry.y safely
-  mutate(
-    ADM2_EN = dplyr::coalesce(ADM2_EN.y, ADM2_EN.x)
-  )
-
-"ADM2_EN" %in% names(forecast_out2)
-table(is.na(forecast_out2$ADM2_EN))
-
-fc_dist <- forecast_out2 %>%
-  group_by(ADM2_EN, ID.time) %>%
-  summarise(
-    Year    = first(Year),
-    Month   = first(Month),
-    fc_mean = sum(mu_mean, na.rm = TRUE),
-    fc_lcl  = sum(mu_lcl,  na.rm = TRUE),
-    fc_ucl  = sum(mu_ucl,  na.rm = TRUE),
-    .groups = "drop"
-  ) %>%
-  arrange(ADM2_EN, ID.time)
-
-table(fc_dist$ADM2_EN)
-head(fc_dist)
-
-
-# Drop geometry to avoid memory issues
-dat0 <- sf::st_drop_geometry(dat) %>%
-  select(ADM2_EN, ID.time, Year, Month, Malaria_Cases)
-
-# Attach fitted values from final model
-dat0$mu_hat <- fit_final$summary.fitted.values$mean
-dat0$mu_lcl <- fit_final$summary.fitted.values$`0.025quant`
-dat0$mu_ucl <- fit_final$summary.fitted.values$`0.975quant`
-
-hist_dist <- dat0 %>%
-  group_by(ADM2_EN, ID.time) %>%
-  summarise(
-    Year    = first(Year),
-    Month   = first(Month),
-    obs     = sum(Malaria_Cases, na.rm = TRUE),
-    fit     = sum(mu_hat, na.rm = TRUE),
-    fit_lcl = sum(mu_lcl, na.rm = TRUE),
-    fit_ucl = sum(mu_ucl, na.rm = TRUE),
-    .groups = "drop"
-  ) %>%
-  arrange(ADM2_EN, ID.time)
-
-
-# forecast_out2 already fixed with ADM2_EN = coalesce(ADM2_EN.y, ADM2_EN.x)
-fc_dist <- forecast_out2 %>%
-  sf::st_drop_geometry() %>%
-  group_by(ADM2_EN, ID.time) %>%
-  summarise(
-    Year    = first(Year),
-    Month   = first(Month),
-    fc_mean = sum(mu_mean, na.rm = TRUE),
-    fc_lcl  = sum(mu_lcl,  na.rm = TRUE),
-    fc_ucl  = sum(mu_ucl,  na.rm = TRUE),
-    .groups = "drop"
-  ) %>%
-  arrange(ADM2_EN, ID.time)
-
-
-# Continuous index per district so forecast continues after history
-hist_dist2 <- hist_dist %>%
-  group_by(ADM2_EN) %>%
-  arrange(ID.time) %>%
-  mutate(t_plot = row_number()) %>%
-  ungroup()
-
-last_t <- hist_dist2 %>%
-  group_by(ADM2_EN) %>%
-  summarise(last_t = max(t_plot), .groups = "drop")
-
-fc_dist2 <- fc_dist %>%
-  left_join(last_t, by = "ADM2_EN") %>%
-  group_by(ADM2_EN) %>%
-  arrange(ID.time) %>%
-  mutate(t_plot = last_t + row_number()) %>%
-  ungroup()
-
-ggplot() +
-  # Historical (BLUE)
-  geom_ribbon(data = hist_dist2, aes(x = t_plot, ymin = fit_lcl, ymax = fit_ucl),
-              fill = "blue", alpha = 0.18) +
-  geom_line(data = hist_dist2, aes(x = t_plot, y = fit),
-            color = "blue", linewidth = 0.8) +
-  geom_line(data = hist_dist2, aes(x = t_plot, y = obs),
-            color = "blue", linetype = "dashed", linewidth = 0.8) +
-  
-  # Forecast (RED)
-  geom_ribbon(data = fc_dist2, aes(x = t_plot, ymin = fc_lcl, ymax = fc_ucl),
-              fill = "red", alpha = 0.22) +
-  geom_line(data = fc_dist2, aes(x = t_plot, y = fc_mean),
-            color = "red", linewidth = 1.0) +
-  
-  # Separator at last observed month (per district)
-  geom_vline(data = last_t, aes(xintercept = last_t), linetype = "dotted") +
-  
-  facet_wrap(~ ADM2_EN, scales = "free_y", ncol = 5) +
-  labs(
-    x = "Time (months)",
-    y = "Malaria cases (district total)",
-    title = "District historical (blue) and 3-month forecast (red) malaria trends",
-    subtitle = "Blue dashed=observed; Blue solid=fitted; Red=forecast; ribbons=95% credible interval"
-  ) +
-  theme_minimal() +
-  theme(strip.text = element_text(size = 8),
-        axis.text.x = element_text(size = 7),
-        axis.text.y = element_text(size = 7))
-
-#Bugesera sector-level forecast maps (3 months)  
-
-
-bug_fc <- forecast_out2 %>%
-  filter(ADM2_EN == "Bugesera") %>%
-  mutate(
-    MonthLabel = paste0(Year, "-", sprintf("%02d", Month)),
-    geometry   = coalesce(geometry.x, geometry.y)
-  ) %>%
-  select(ADM3_EN, ADM2_EN, Year, Month, MonthLabel,
-         mu_mean, mu_lcl, mu_ucl, geometry) %>%
-  st_as_sf()
-
-# quick check
-summary(bug_fc$mu_mean)
-
-bug_lab <- bug_fc %>%
-  st_centroid(of_largest_polygon = TRUE) %>%
-  mutate(
-    label = round(mu_mean, 1)   # one decimal is PPT-friendly
-  )
-
-ggplot(bug_fc) +
-  geom_sf(aes(fill = mu_mean), color = "grey30", linewidth = 0.25) +
-  
-  # numeric labels
-  geom_sf_text(
-    data = bug_lab,
-    aes(label = label),
-    size = 3,
-    color = "black",
-    fontface = "bold"
-  ) +
-  
-  facet_wrap(~ MonthLabel, ncol = 3) +
-  scale_fill_viridis_c(
-    option = "C",
-    labels = comma,
-    name   = "Predicted\nmalaria cases"
-  ) +
-  labs(
-    title = "Bugesera District: sector-level malaria predictions (next 3 months)",
-    subtitle = "Numbers inside sectors = posterior mean of predicted cases"
-  ) +
-  theme_minimal() +
-  theme(
-    strip.text = element_text(size = 11, face = "bold"),
-    legend.position = "bottom"
-  )
-
-
-
-# --------------------------------------------------
-# 1) Extract Bugesera data
-# --------------------------------------------------
-hist_bug <- hist_dist %>%
-  filter(ADM2_EN == "Bugesera") %>%
-  arrange(ID.time) %>%
-  mutate(t_plot = row_number())
-
-last_t <- max(hist_bug$t_plot)
-
-fc_bug <- fc_dist %>%
-  filter(ADM2_EN == "Bugesera") %>%
-  arrange(ID.time) %>%
-  mutate(t_plot = last_t + row_number())
-
-# --------------------------------------------------
-# 2) Line plot
-# --------------------------------------------------
-ggplot() +
-  # -------------------------
-# Historical fitted (BLUE)
-# -------------------------
-geom_ribbon(
-  data = hist_bug,
-  aes(x = t_plot, ymin = fit_lcl, ymax = fit_ucl),
-  fill = "blue", alpha = 0.18
-) +
-  geom_line(
-    data = hist_bug,
-    aes(x = t_plot, y = fit),
-    color = "blue", linewidth = 1
-  ) +
-  geom_line(
-    data = hist_bug,
-    aes(x = t_plot, y = obs),
-    color = "blue", linetype = "dashed", linewidth = 1
-  ) +
-  
-  # -------------------------
-# Forecast (RED)
-# -------------------------
-geom_ribbon(
-  data = fc_bug,
-  aes(x = t_plot, ymin = fc_lcl, ymax = fc_ucl),
-  fill = "red", alpha = 0.22
-) +
-  geom_line(
-    data = fc_bug,
-    aes(x = t_plot, y = fc_mean),
-    color = "red", linewidth = 1.2
-  ) +
-  
-  # Separator
-  geom_vline(xintercept = last_t, linetype = "dotted") +
-  
-  labs(
-    x = "Time (months)",
-    y = "Malaria cases (district total)",
-    title = "Bugesera District: malaria trend and 3-month forecast",
-    subtitle = "Blue = historical (solid fitted, dashed observed); Red = forecast; shaded = 95% credible interval"
-  ) +
-  theme_minimal()
-
-library(dplyr)
-library(tidyr)
-
-pred_jan_mar_2025_long <- fc_dist2 %>%
-  filter(Year == 2025, Month %in% 1:3) %>%
-  select(ADM2_EN, Year, Month, fc_mean, fc_lcl, fc_ucl) %>%
-  arrange(ADM2_EN, Year, Month)
-
-pred_jan_mar_2025_wide <- pred_jan_mar_2025_long %>%
-  mutate(Month_lab = factor(Month, levels = 1:3, labels = c("Jan", "Feb", "Mar"))) %>%
-  pivot_wider(
-    names_from  = Month_lab,
-    values_from = c(fc_mean, fc_lcl, fc_ucl),
-    names_glue  = "{.value}_{Month_lab}"
-  ) %>%
-  arrange(ADM2_EN)
-
-pred_jan_mar_2025_long
-pred_jan_mar_2025_wide
-
-library(tidyr)
-
-pred_by_district_wide <- pred_jan_mar_2025_long %>%
-  mutate(Month_lab = factor(Month,
-                            levels = 1:3,
-                            labels = c("Jan", "Feb", "Mar"))) %>%
-  pivot_wider(
-    names_from  = Month_lab,
-    values_from = c(fc_mean, fc_lcl, fc_ucl),
-    names_glue  = "{.value}_{Month_lab}"
-  ) %>%
-  arrange(ADM2_EN)
-
-pred_by_district_wide
-
-write.csv(pred_by_district_wide,
-          "Malaria_Predictions_District_Jan_Mar_2025.csv",
-          row.names = FALSE)
-
-library(dplyr)
-library(tidyr)
-
-pred_mean_only <- pred_jan_mar_2025_long %>%
-  mutate(Month_lab = factor(Month,
-                            levels = 1:3,
-                            labels = c("Jan", "Feb", "Mar"))) %>%
-  select(ADM2_EN, Month_lab, fc_mean) %>%
-  pivot_wider(
-    names_from  = Month_lab,
-    values_from = fc_mean,
-    names_glue  = "{Month_lab}_Mean"
-  ) %>%
-  arrange(ADM2_EN)
-
-pred_mean_only
-Pred<- pred_mean_only
-
-write.csv(pred_mean_only,
-          "Malaria_Mean_Predictions_District_Jan_Mar_2025.csv",
-          row.names = FALSE)
-Obs<-read_excel("Jan_March.xls")
-names(Obs)
-# Extract numeric column names (except "Districts")
-date_cols <- names(Obs)[-1]
-
-# Convert from Excel serial to Date
-dates <- as.Date(as.numeric(date_cols), origin = "1899-12-30")
-
-dates
-format(dates, "%B %Y")
-names(Obs)[-1] <- format(dates, "%b_%Y")
-
-names(Obs)
-names()
-names(Pred)
-names(Pred) <- c("Districts", "Jan_2025", "Feb_2025", "Mar_2025")
-compare_df <- left_join(Pred, Obs, by = "Districts")
-names(compare_df)
-comparison <- Pred %>%
-  left_join(Obs, by = "Districts", suffix = c("_Pred", "_Obs"))
-names(comparison)
-
-library(dplyr)
-
-comparison_pct <- comparison %>%
-  mutate(
-    Jan_pct  = 100 * (Jan_2025_Pred - Jan_2025_Obs) / Jan_2025_Obs,
-    Feb_pct  = 100 * (Feb_2025_Pred - Feb_2025_Obs) / Feb_2025_Obs,
-    Mar_pct  = 100 * (Mar_2025_Pred - Mar_2025_Obs) / Mar_2025_Obs
-  )
-library(dplyr)
-library(tidyr)
-
-plot_df <- comparison %>%
-  pivot_longer(
-    cols = -Districts,
-    names_to = c("Month", "Type"),
-    names_pattern = "(Jan|Feb|Mar)_2025_(Pred|Obs)",
-    values_to = "Cases"
-  ) %>%
-  pivot_wider(names_from = Type, values_from = Cases)
-install.packages("ggpubr")
-library(ggpubr)
-
-ggplot(plot_df, aes(x = Obs, y = Pred)) +
-  geom_point(alpha = 0.7) +
-  geom_smooth(method = "lm", se = FALSE) +
-  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "red") +
-  facet_wrap(~ Month) +
-  stat_cor(method = "pearson") +
-  theme_minimal()
-
-diff_pct <- comparison %>%
-  mutate(
-    Jan_pct = 100 * (Jan_2025_Pred - Jan_2025_Obs) / Jan_2025_Obs,
-    Feb_pct = 100 * (Feb_2025_Pred - Feb_2025_Obs) / Feb_2025_Obs,
-    Mar_pct = 100 * (Mar_2025_Pred - Mar_2025_Obs) / Mar_2025_Obs
-  ) %>%
-  select(Districts, Jan_pct, Feb_pct, Mar_pct) %>%
-  pivot_longer(-Districts, names_to = "Month", values_to = "Percent_Diff")
-
-library(ggplot2)
-
-ggplot(diff_pct,
-       aes(x = reorder(Districts, Percent_Diff),
-           y = Percent_Diff,
-           fill = Percent_Diff)) +
-  geom_col() +
-  coord_flip() +
-  facet_wrap(~ Month, scales = "free_y") +
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  scale_fill_gradient2(
-    low = "steelblue",
-    mid = "white",
-    high = "firebrick",
-    midpoint = 0
-  ) +
-  labs(
-    x = "District",
-    y = "Percent Difference (%)",
-    title = "District-Level Percentage Prediction Error (Jan–Mar 2025)",
-    subtitle = "Blue = Underestimation | Red = Overestimation"
-  ) +
-  theme_minimal() +
-  theme(
-    legend.position = "none",
-    strip.text = element_text(size = 12, face = "bold"),
-    axis.text.y = element_text(size = 7)
-  )
-
-
-################## END  OF THE SCRIPT#########################################
-
-# The negative binomial in this series 
-fit_inla <- function(formula, data, family = c("poisson","nbinomial"), offset_var = "offset_pop"){
-  family <- match.arg(family)
-  inla(
-    formula           = formula,
-    family            = family,
-    data              = data,
-    offset            = data[[offset_var]],
-    control.compute   = list(dic = TRUE, waic = TRUE, cpo = TRUE, config = TRUE),
-    control.predictor = list(compute = TRUE)
-  )
-}
-
-# Fit NB versions for the models you want to compare
-models_list_nb <- list(
-  iid              = fit_inla(formula_iid,              dat, family="nbinomial"),
-  besag            = fit_inla(formula_besag,            dat, family="nbinomial"),
-  bym              = fit_inla(formula1_bym,             dat, family="nbinomial"),
-  rw1              = fit_inla(formula_rw1,              dat, family="nbinomial"),
-  rw1_iid          = fit_inla(formula_rw1_iid,          dat, family="nbinomial"),
-  rw2              = fit_inla(formula_rw2,              dat, family="nbinomial"),
-  bym_rw1          = fit_inla(formula_bym_rw1,          dat, family="nbinomial"),
-  bym_rw1_iidst    = fit_inla(formula_bym_rw1_iidst,    dat, family="nbinomial"),
-  bym_rw2_iidst    = fit_inla(formula_bym_rw2_iidst,    dat, family="nbinomial"),
-  bym2_rw2_iidst   = fit_inla(formula_bym2_rw2_iidst,   dat, family="nbinomial"),
-  bym_climate      = fit_inla(formula_bym_climate,      dat, family="nbinomial"),
-  bym_climate_lags = fit_inla(formula_bym_climate_lags, dat, family="nbinomial")
-)
-
-cmp_nb <- compare_inla_models(models_list_nb, sort_by="waic")
-print(cmp_nb)
-#Compare Poisson vs NB directly (same formula)
-
-fit_final_pois <- inla(
-  formula = formula_final_bym,
-  family  = "poisson",
-  data    = dat,
-  offset  = offset_pop,
-  control.compute   = list(dic=TRUE, waic=TRUE, cpo=TRUE),
-  control.predictor = list(compute=TRUE, link=1)
-)
-
-fit_final_nb <- inla(
-  formula = formula_final_bym,
-  family  = "nbinomial",
-  data    = dat,
-  offset  = offset_pop,
-  control.compute   = list(dic=TRUE, waic=TRUE, cpo=TRUE),
-  control.predictor = list(compute=TRUE, link=1)
-)
-
-data.frame(
-  Model = c("Poisson","NegBin"),
-  WAIC  = c(fit_final_pois$waic$waic, fit_final_nb$waic$waic),
-  DIC   = c(fit_final_pois$dic$dic,   fit_final_nb$dic$dic),
-  mean_LCPO = c(mean(log(fit_final_pois$cpo$cpo), na.rm=TRUE),
-                mean(log(fit_final_nb$cpo$cpo),   na.rm=TRUE))
-)
-
-
-#Forecasting with NB
-fit_forecast_nb <- inla(
-  formula           = formula_final_bym,
-  family            = "nbinomial",
-  data              = dat_forecast,
-  offset            = offset_pop,
-  control.compute   = list(dic = TRUE, waic = TRUE, config = TRUE),
-  control.predictor = list(compute = TRUE, link = 1)
-)
-
-
-#Optional: set a prior for NB overdispersion
-
-
-ctrl_family_nb <- list(
-  hyper = list(
-    theta = list(prior = "pc.prec", param = c(1, 0.01))  # example; adjust if needed
-  )
-)
-
-fit_final_nb <- inla(
-  formula = formula_final_bym,
-  family  = "nbinomial",
-  data    = dat,
-  offset  = offset_pop,
-  control.family    = ctrl_family_nb,
-  control.compute   = list(dic=TRUE, waic=TRUE, cpo=TRUE),
-  control.predictor = list(compute=TRUE, link=1)
-)
-
-# 
-nrow(dat)                   # dataset size
-length(fit_final_pois$cpo$cpo)
-length(fit_final_nb$cpo$cpo)
-
-f(ID, model="bym2",
-  graph = Rwa_adj,
-  scale.model = TRUE,
-  constr = TRUE,
-  hyper = hyper_bym2)
-
-
-
-dat <- dat %>%
-  mutate(
-    Rain_MA12 = (Prec_lag1 + Prec_lag2) / 2,
-    Temp_MA12 = (Max_temp_lag1 + Max_temp_lag2) / 2,
-    MinTemp_MA12 = (Min_temp_lag1 + Min_temp_lag2) / 2,
-    RH_MA12 = (RH_lag1 + RH_lag2) / 2
-  )
-
-dat <- dat %>%
-  mutate(
-    Rain_MA12  = scale(Rain_MA12),
-    Temp_MA12  = scale(Temp_MA12),
-    RH_MA12    = scale(RH_MA12)
-  )
-
-formula_poisson_upgrade <- as.integer(Malaria_Cases) ~ 1 +
-  Rain_MA12 +
-  Temp_MA12 +
-  RH_MA12 +
-  
-  f(ID, model="bym2",
-    graph=Rwa_adj,
-    scale.model=TRUE,
-    constr=TRUE,
-    hyper=hyper_bym2) +
-  
-  f(ID.time, model="rw2",
-    constr=TRUE,
-    scale.model=TRUE,
-    hyper=list(prec=list(prior="pc.prec", param=c(1,0.01)))) +
-  
-  f(ID.space.time, model="iid",
-    constr=TRUE,
-    hyper=list(prec=list(prior="pc.prec", param=c(1,0.01))))
-
-fit_poisson_upgrade <- inla(
-  formula           = formula_poisson_upgrade,
-  family            = "poisson",
-  data              = dat,
-  offset            = offset_pop,
-  control.compute   = list(dic=TRUE, waic=TRUE, cpo=TRUE, config=TRUE),
-  control.predictor = list(compute=TRUE, link=1)
-)
-
-fit_poisson_upgrade$waic$waic
-fit_poisson_upgrade$dic$dic
-
 
 
