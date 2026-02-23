@@ -3,9 +3,6 @@
 # Rwanda sector-level spatio-temporal malaria modelling with climate covariates
 # ============================================================================
 
-# ----------------------------------------------------------------------------
-# 1) SETUP: Packages, options, and paths
-# ----------------------------------------------------------------------------
 pacman::p_load(
   dplyr, sf, tidyr, ggplot2, lubridate, ggtext,
   INLA, spdep, readxl, rio, here, stringr,
@@ -416,17 +413,6 @@ fixef_climate <- fixef %>%
 print(fixef_climate)
 
 # ============================================================
-# POST-PROCESSING: Spatial RR, Exceedance PP, Temporal RR + CI
-# Requires: fit_final, dat (sf), INLA
-# ============================================================
-
-# ============================================================
-# POST-PROCESSING (CORRECTED):
-# Spatial RR + 95% CrI + PP(RR>1)
-# Temporal RR + 95% CrI  (FIX: ID.time from rownames)
-# Optional: Space-time RR + 95% CrI
-# Requires: fit_final, dat (sf), INLA
-# ============================================================
 
 # ============================================================
 # 1) SPATIAL: RR_i + 95% CrI + posterior exceedance P(RR>1)
@@ -493,20 +479,6 @@ temp_out <- temp_out %>%
 # ============================================================
 # 3) (Optional) SPACE–TIME interaction: RR_st + 95% CrI
 # ============================================================
-
-#st_out <- NULL
-#if (!is.null(fit_final$summary.random$ID.space.time)) {
-# st_out <- fit_final$summary.random$ID.space.time %>%
-#   as.data.frame() %>%
-#    rownames_to_column("ID.space.time") %>%  # robust: index often in rownames
-#    mutate(
-#      ID.space.time = as.integer(ID.space.time),
-#     RR_st     = exp(mean),
-#     RR_st_LCL = exp(`0.025quant`),
-#     RR_st_UCL = exp(`0.975quant`)
-#   ) %>%
-#   select(ID.space.time, RR_st, RR_st_LCL, RR_st_UCL)
-#}
 
 
 # ============================================================
@@ -1000,5 +972,6 @@ ggplot() +
     axis.text.x = element_text(size = 7),
     axis.text.y = element_text(size = 7)
   )
+
 
 
