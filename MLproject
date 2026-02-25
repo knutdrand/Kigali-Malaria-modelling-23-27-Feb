@@ -1,0 +1,51 @@
+name: kigali_malaria_bym
+
+target: disease_cases
+required_covariates:
+  - population
+supported_period_type: month
+allow_free_additional_continuous_covariates: true
+
+meta_data:
+  display_name: Kigali Malaria BYM Model
+  description: >
+    Spatio-temporal Bayesian model for malaria incidence in Rwanda at the
+    sector (ADM3) level, using BYM spatial effects, RW1 temporal effects,
+    and IID space-time interaction with lagged climate covariates.
+    Implemented with R-INLA.
+  author: CHAP team
+  organization: HISP Centre, University of Oslo
+  organization_logo_url: https://landportal.org/sites/default/files/2024-03/university_of_oslo_logo.png
+  contact_email: knut.rand@dhis2.org
+  citation_info: >
+    Climate Health Analytics Platform. 2025. "Kigali Malaria BYM Model".
+    HISP Centre, University of Oslo.
+    https://dhis2-chap.github.io/chap-core/external_models/overview_of_supported_models.html
+
+adapters: {'Cases': 'disease_cases',
+           'E': 'population',
+           'month': 'month',
+           'ID_year': 'year',
+           'ID_spat': 'location',
+           }
+
+docker_env:
+  image: ghcr.io/dhis2-chap/docker_r_inla:master
+
+entry_points:
+  train:
+    parameters:
+      train_data: path
+      model: str
+      model_config: path
+      polygons: path
+    command: "Rscript train.R {train_data} {model} {model_config} {polygons}"
+  predict:
+    parameters:
+      historic_data: path
+      future_data: path
+      model: str
+      out_file: path
+      model_config: path
+      polygons: path
+    command: "Rscript predict.R {model} {historic_data} {future_data} {out_file} {model_config} {polygons}"
