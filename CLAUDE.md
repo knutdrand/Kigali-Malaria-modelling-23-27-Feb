@@ -2,6 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Git Remotes
+
+- `origin` — upstream repo: `git@github.com:Similien1/Kigali-Malaria-modelling-23-27-Feb.git` (read-only)
+- `fork` — writable fork: `git@github.com:knutdrand/Kigali-Malaria-modelling-23-27-Feb.git`
+
+Push to `fork` (e.g., `git push fork main`).
+
 ## Project Overview
 
 Spatio-temporal Bayesian modelling pipeline for malaria incidence in Rwanda at the sector (ADM3) level, using R-INLA. The entire analysis lives in a single R script: `Malaria_Kigali_ Model.R`.
