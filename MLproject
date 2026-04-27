@@ -1,19 +1,22 @@
-name: kigali_malaria_bym
+name: rwanda_malaria_bym
 
 target: disease_cases
 required_covariates:
   - population
+  - rainfall
+  - mean_temperature
+  - relative_humidity
 supported_period_type: month
 allow_free_additional_continuous_covariates: true
 
 meta_data:
-  display_name: Kigali Malaria BYM Model
+  display_name: Rwanda Malaria BYM Model
   description: >
     Spatio-temporal Bayesian model for malaria incidence in Rwanda at the
     sector (ADM3) level, using BYM spatial effects, RW1 temporal effects,
     and IID space-time interaction with lagged climate covariates.
     Implemented with R-INLA.
-  author: CHAP team
+  author: similien NDAGIJIMANA
   organization: HISP Centre, University of Oslo
   organization_logo_url: https://landportal.org/sites/default/files/2024-03/university_of_oslo_logo.png
   contact_email: knut.rand@dhis2.org
