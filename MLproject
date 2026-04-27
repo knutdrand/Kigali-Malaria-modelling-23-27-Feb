@@ -16,7 +16,7 @@ meta_data:
     sector (ADM3) level, using BYM spatial effects, RW1 temporal effects,
     and IID space-time interaction with lagged climate covariates.
     Implemented with R-INLA.
-  author: similien NDAGIJIMANA
+  author: Similien NDAGIJIMANA
   organization: HISP Centre, University of Oslo
   organization_logo_url: https://landportal.org/sites/default/files/2024-03/university_of_oslo_logo.png
   contact_email: knut.rand@dhis2.org
